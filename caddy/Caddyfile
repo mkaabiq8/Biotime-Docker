@@ -1,0 +1,47 @@
+{
+	email {$ACME_EMAIL}
+	admin off
+}
+
+{$BIOTIME_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:{$BIOTIME_BACKEND_PORT}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		-Server
+	}
+
+	log {
+		output file /data/biotime-ui-access.log {
+			roll_size 20MiB
+			roll_keep 5
+			roll_keep_for 168h
+		}
+	}
+}
+
+# Many attendance terminals only support plain HTTP for ADMS/push traffic.
+# On this port, expose only the device endpoint rather than the whole GUI.
+:{$DEVICE_HTTP_PORT} {
+	@device_endpoint path /iclock /iclock/*
+
+	handle @device_endpoint {
+		reverse_proxy 127.0.0.1:{$BIOTIME_BACKEND_PORT}
+	}
+
+	handle {
+		respond "Not Found" 404
+	}
+
+	log {
+		output file /data/biotime-device-access.log {
+			roll_size 20MiB
+			roll_keep 5
+			roll_keep_for 168h
+		}
+	}
+}
+

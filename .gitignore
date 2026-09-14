@@ -1,0 +1,16 @@
+.env
+.DS_Store
+
+# Licensed vendor media must not be committed to a public repository.
+installer/*
+!installer/README.md
+
+# Persistent VM disks, certificates, logs, and backups.
+data/*
+!data/.gitkeep
+backups/*
+!backups/.gitkeep
+
+*.bak
+*.log
+

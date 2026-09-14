@@ -1,0 +1,32 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  deployment-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+      - name: Validate shell scripts
+        run: shellcheck scripts/*.sh
+      - name: Validate Compose model
+        run: |
+          cp .env.example .env
+          docker compose --env-file .env --profile public config --quiet
+      - name: Validate Caddy configuration
+        run: |
+          docker run --rm \
+            -e BIOTIME_DOMAIN=biotime.example.com \
+            -e ACME_EMAIL=admin@example.com \
+            -e BIOTIME_BACKEND_PORT=18090 \
+            -e DEVICE_HTTP_PORT=8080 \
+            -v "$PWD/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.10.2-alpine \
+            caddy validate --config /etc/caddy/Caddyfile

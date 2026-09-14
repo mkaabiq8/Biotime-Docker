@@ -1,0 +1,61 @@
+name: ${COMPOSE_PROJECT_NAME:-biotime}
+
+services:
+  windows:
+    image: dockurr/windows:6.03
+    container_name: biotime-windows
+    environment:
+      VERSION: ${WINDOWS_VERSION:-10l}
+      RAM_SIZE: ${WINDOWS_RAM_SIZE:-8G}
+      CPU_CORES: ${WINDOWS_CPU_CORES:-4}
+      DISK_SIZE: ${WINDOWS_DISK_SIZE:-128G}
+      USERNAME: ${WINDOWS_USERNAME:?Set WINDOWS_USERNAME in .env}
+      PASSWORD: ${WINDOWS_PASSWORD:?Set WINDOWS_PASSWORD in .env}
+      UUID: ${WINDOWS_UUID:?Set WINDOWS_UUID in .env}
+      MAC: ${WINDOWS_MAC:?Set WINDOWS_MAC in .env}
+      HOST: ${WINDOWS_HOSTNAME:-BIOTIME}
+      LANGUAGE: ${WINDOWS_LANGUAGE:-English}
+      REGION: ${WINDOWS_REGION:-en-US}
+      KEYBOARD: ${WINDOWS_KEYBOARD:-en-US}
+      TZ: ${TZ:-Asia/Kuwait}
+      SAMBA_READONLY: "Y"
+    devices:
+      - /dev/kvm
+      - /dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    ports:
+      # Administration is intentionally loopback-only. Use an SSH tunnel.
+      - "127.0.0.1:${SETUP_WEB_PORT:-8006}:8006/tcp"
+      - "127.0.0.1:${RDP_PORT:-3389}:3389/tcp"
+      - "127.0.0.1:${RDP_PORT:-3389}:3389/udp"
+      # BioTime listens on 8090 inside Windows; Caddy reaches it on this port.
+      - "127.0.0.1:${BIOTIME_BACKEND_PORT:-18090}:8090/tcp"
+    volumes:
+      - ./data/windows:/storage
+      - ./installer:/shared:ro
+      - ./oem:/oem:ro
+    restart: unless-stopped
+    stop_grace_period: 2m
+
+  caddy:
+    image: caddy:2.10.2-alpine
+    container_name: biotime-proxy
+    profiles:
+      - public
+    network_mode: host
+    environment:
+      BIOTIME_DOMAIN: ${BIOTIME_DOMAIN:?Set BIOTIME_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL in .env}
+      BIOTIME_BACKEND_PORT: ${BIOTIME_BACKEND_PORT:-18090}
+      DEVICE_HTTP_PORT: ${DEVICE_HTTP_PORT:-8080}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/caddy-data:/data
+      - ./data/caddy-config:/config
+    read_only: true
+    tmpfs:
+      - /tmp
+    depends_on:
+      - windows
+    restart: unless-stopped
